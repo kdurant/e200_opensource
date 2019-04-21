@@ -41,20 +41,20 @@ module e203_exu_decode(
   //////////////////////////////////////////////////////////////
   // The Decoded Info-Bus
 
-  output dec_rs1x0,
+  output dec_rs1x0,       // rs1, i_instr[19:15] 等于0的时候, 输出1
   output dec_rs2x0,
-  output dec_rs1en,
-  output dec_rs2en,
-  output dec_rdwen,
+  output dec_rs1en,       // 当前指令是否需要读取rs1
+  output dec_rs2en,       // 当前指令是否需要读取rs2
+  output dec_rdwen,       // 当前指令是否需要读取rd
   output [`E203_RFIDX_WIDTH-1:0] dec_rs1idx,
   output [`E203_RFIDX_WIDTH-1:0] dec_rs2idx,
   output [`E203_RFIDX_WIDTH-1:0] dec_rdidx,
   output [`E203_DECINFO_WIDTH-1:0] dec_info,  
-  output [`E203_XLEN-1:0] dec_imm,
+  output [`E203_XLEN-1:0] dec_imm,  // 该指令使用的立即数的值
   output [`E203_PC_SIZE-1:0] dec_pc,
   output dec_misalgn,
   output dec_buserr,
-  output dec_ilegl,
+  output dec_ilegl,   // 非法指令
   
 
   output dec_mulhsu,
@@ -79,15 +79,19 @@ module e203_exu_decode(
   wire [32-1:0] rv32_instr = i_instr;
   wire [16-1:0] rv16_instr = i_instr[15:0];
 
+// rv32_instr[6:0] 是指令的操作码部分
   wire [6:0]  opcode = rv32_instr[6:0];
 
+// 00, 10, 01 属于RVC编码
   wire opcode_1_0_00  = (opcode[1:0] == 2'b00);
   wire opcode_1_0_01  = (opcode[1:0] == 2'b01);
   wire opcode_1_0_10  = (opcode[1:0] == 2'b10);
   wire opcode_1_0_11  = (opcode[1:0] == 2'b11);
 
+  // i_instr[4:2] = 3'b111时, rv32 = 0
   wire rv32 = (~(i_instr[4:2] == 3'b111)) & opcode_1_0_11;
 
+  // 参考RISC-V基本指令格式
   wire [4:0]  rv32_rd     = rv32_instr[11:7];
   wire [2:0]  rv32_func3  = rv32_instr[14:12];
   wire [4:0]  rv32_rs1    = rv32_instr[19:15];
@@ -179,9 +183,16 @@ module e203_exu_decode(
   wire rv32_rs2_x31 = (rv32_rs2 == 5'b11111);
   wire rv32_rd_x31  = (rv32_rd  == 5'b11111);
 
+  // lb, lh, lw, lbu, lhu这些LOAD相关指令的opcode都是一样的
   wire rv32_load     = opcode_6_5_00 & opcode_4_2_000 & opcode_1_0_11; 
+
+  // sb, sh, sw 
   wire rv32_store    = opcode_6_5_01 & opcode_4_2_000 & opcode_1_0_11; 
+
+  // RV32F标准扩展指令
   wire rv32_madd     = opcode_6_5_10 & opcode_4_2_000 & opcode_1_0_11; 
+
+  // RV32I BEQ指令
   wire rv32_branch   = opcode_6_5_11 & opcode_4_2_000 & opcode_1_0_11; 
 
   wire rv32_load_fp  = opcode_6_5_00 & opcode_4_2_001 & opcode_1_0_11; 
@@ -195,12 +206,15 @@ module e203_exu_decode(
   wire rv32_resved0  = opcode_6_5_11 & opcode_4_2_010 & opcode_1_0_11; 
 
   wire rv32_miscmem  = opcode_6_5_00 & opcode_4_2_011 & opcode_1_0_11; 
+
   `ifdef E203_SUPPORT_AMO//{
   wire rv32_amo      = opcode_6_5_01 & opcode_4_2_011 & opcode_1_0_11; 
   `endif//E203_SUPPORT_AMO}
+
   `ifndef E203_SUPPORT_AMO//{
   wire rv32_amo      = 1'b0;
   `endif//}
+
   wire rv32_nmadd    = opcode_6_5_10 & opcode_4_2_011 & opcode_1_0_11; 
   wire rv32_jal      = opcode_6_5_11 & opcode_4_2_011 & opcode_1_0_11; 
 
